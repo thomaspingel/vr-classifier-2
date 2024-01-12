@@ -1,0 +1,1046 @@
+<html>
+  <head>
+    <!--     <script src="https://threejs.org/build/three.js"></script>  -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/handy-work@3.1.9/build/handy-controls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls/dist/aframe-blink-controls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-htmlmesh@2.0.1/build/aframe-html.min.js"></script>
+    <script src="https://unpkg.com/aframe-text-geometry-component@0.5.1/dist/aframe-text-geometry-component.min.js"></script>
+    <script src="https://rawgit.com/rdub80/aframe-gui/master/dist/aframe-gui.min.js"></script>
+
+    <script src="aframe-loader-laz-component.min.js"></script>
+    <!--     <script src="./lasloader.js" type="module"></script> -->
+    <script src="./classifier.js"></script>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <script>
+    // add classifications window
+    function toggleAddClass() {
+      let addwindow = document.getElementById("addcolor");
+      if (addwindow.hidden == true) {
+        addwindow.hidden = false;
+        document.getElementById("plusbtn").innerText = "x";
+        document.getElementById("plusbtn").style = "font-size:35px";
+        document.getElementById("my-interface").style =
+          "background-color:white; width:800px";
+      } else {
+        addwindow.hidden = true;
+        document.getElementById("plusbtn").innerText = "+";
+        document.getElementById("plusbtn").style = "font-size:25px";
+        document.getElementById("my-interface").style =
+          "background-color:white; width:800px";
+      }
+    }
+  </script>
+  <a-scene
+    webxr="overlayElement:dom-overlay"
+    cursor="rayOrigin: mouse"
+    raycaster="objects: [html]; interval:100;"
+    inspector="url: https://cdn.jsdelivr.net/gh/aframevr/aframe-inspector@master/dist/aframe-inspector.min.js"
+  >
+    <a-assets>
+      <a-asset-item
+        id="textfont4"
+        src="Assets/DiplomataSC-Regular.ttf"
+      ></a-asset-item>
+      <!-- 			<a-mixin id="blink" blink-controls="collisionEntities: #ground;"></a-mixin> -->
+      <a-mixin
+        id="blink"
+        blink-controls="rotateOnTeleport:true;cameraRig: #cameraRig; teleportOrigin: #head; collisionEntities:#ground;"
+      ></a-mixin>
+      <a-mixin
+        id="raycaster"
+        raycaster="showLine: true; far: 2; lineColor: red; objects: [html], #pointcloud; interval:100;"
+      ></a-mixin>
+      <a-mixin
+        id="menubutton"
+        width="0.2"
+        height="0.08"
+        base-depth="0.005"
+        depth="0.02"
+        hover-color="#ffff00"
+        active-color="#ff0000"
+        on="click"
+        toggle="true"
+        font-color="black"
+        gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+      >
+      </a-mixin>
+
+      <a-asset-item
+        id="optimerBoldFont"
+        src="https://rawgit.com/mrdoob/three.js/dev/examples/fonts/optimer_bold.typeface.json"
+      ></a-asset-item>
+    </a-assets>
+
+    <!-- CONTROLS -->
+    <!--  -->
+    <!--   <a-entity oculus-touch-controls="hand: left" raycaster="objects: .collidable; showLine:true; near: 0.1; far:100 autoRefresh:false" trigger> -->
+
+    <!--   </a-entity> -->
+    <a-entity trigger></a-entity>
+
+    <a-entity id="cameraRig" spawn-in-circle="radius:3">
+      <!-- camera -->
+      <a-entity
+        class="avatar-head"
+        camera="near:0.01;"
+        cursor="rayOrigin: mouse"
+        look-controls="pointerLockEnabled: false"
+        wasd-controls="acceleration:150;"
+        position="0 0 0"
+      >
+        <!--         <a-entity id="download-buttonid" geometry="primitive: box" material="color: red" position="-3 1 -2.5"></a-entity> -->
+        <a-entity
+          style="cursor: pointer; transition: all 0.2s ease-in-out"
+          id="download-buttonid"
+          class="button"
+          position="-4 1.7 -2.5"
+          geometry="primitive: plane; width: 1; height: 0.3;"
+          material="color: #4cc3d9; shader: flat;"
+          text="value: Download Cloud - csv; color: white; align: center; width: 2;"
+          onmouseenter="this.setAttribute('scale', '1.1 1.1 1.1')"
+          onmouseleave="this.setAttribute('scale', '1 1 1')"
+        ></a-entity>
+      </a-entity>
+
+      <!-- Hand tracking -->
+      <!-- 			<a-entity handy-controls > -->
+
+      <!-- These also do teleportaion for Blink controls in VR -->
+      <!-- These are present for hand tracking but hands don't have joysticks so do nothing -->
+      <a-entity
+        oculus-touch-controls="hand: right"
+        thumbstick-logging
+        id="righthand"
+        data-right="ray"
+        mixin=""
+        cursor
+        laser-controls="hand:right"
+        classify="sphere:sphereR; hand:r"
+        raycaster="showLine: true; far: 12; lineColor: red; objects: [gui-interactable], #pointcloud, menu-button; interval:100; direction:0 -1 -1"
+      >
+        <!--           <a-sphere id="sph" position="0 0 -0.2" material="color:yellow; opacity:0.5" scale="0.12 0.12 0.12" classify></a-sphere> -->
+      </a-entity>
+      <a-entity
+        oculus-touch-controls="hand: left"
+        thumbstick-logging
+        id="lefthand"
+        data-left="ray"
+        mixin=""
+        xraycaster="showLine: true; far: 12; lineColor: blue; objects: [html, #menu], #pointcloud; interval:100; direction:0 -1 -1"
+        cursor
+        xclassify="sphere:sphereL; hand:l"
+      >
+        <a-gui-flex-container
+          width="0.2"
+          height="0.2"
+          position="0 0.1 0"
+          rotation="-80 90 0"
+          opacity="0"
+          flex-direction="column"
+          justify-content="flexStart"
+        >
+            
+            <a-gui-flex-container width="0.2" height="0.035" opacity="0">
+            <a-text
+              value="1"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.092 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="2"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.058 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="3"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.022 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="4"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.013 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="5"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.048 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="6"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.084 -0.017 0.015"
+            ></a-text>
+            <a-gui-button
+              id="b1"
+              width="0.035"
+              height="0.035"
+              base-depth="0."
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#c8c8c8"
+              onclick="handleRadio(1)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b2"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#804e0a"
+              onclick="handleRadio(2)"
+            ></a-gui-button>
+             <a-gui-button
+              id="b3"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#167518"
+              onclick="handleRadio(3)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b4"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#21a624"
+              onclick="handleRadio(4)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b5"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#32ed36"
+              onclick="handleRadio(5)"
+            ></a-gui-button>
+             <a-gui-button
+              id="b6"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#3a9ebd"
+              onclick="handleRadio(6)"
+            ></a-gui-button>
+          </a-gui-flex-container>
+          <a-gui-flex-container width="0.2" height="0.035" opacity="0">
+            <a-text
+              value="7"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.092 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="8"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.058 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="9"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.022 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="10"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.007 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="11"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.042 -0.017 0.015"
+            ></a-text>
+            <a-text
+              value="12"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="0.076 -0.017 0.015"
+            ></a-text>
+            <a-gui-button
+              id="b7"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ff0000"
+              onclick="handleRadio(7)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b8"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ffff00"
+              onclick="handleRadio(8)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b9"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#0000ff"
+              onclick="handleRadio(9)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b10"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ed8f02"
+              onclick="handleRadio(10)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b11"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ed8f02"
+              onclick="handleRadio(11)"
+            ></a-gui-button>
+            <a-gui-button
+              id="b12"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ff00ff"
+              onclick="handleRadio(12)"
+            ></a-gui-button>
+          </a-gui-flex-container>
+          <a-gui-flex-container
+            width="0.2" height="0.035" opacity="1"
+          >
+            <a-text
+              value="-"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.09 -0.017 0.015" >
+            </a-text>
+            <a-text
+              value="+"
+              color="black"
+              scale="0.1 0.1 0.1"
+              position="-0.058 -0.017 0.015" >
+            </a-text>
+            <a-text
+              value="rgb"
+              color="black"
+              scale="0.06 0.06 0.06"
+              position="-0.022 -0.017 0.015" >
+            </a-text>
+            <a-text
+              value="classi-\nfication"
+              color="black"
+              scale="0.037 0.04 0.037"
+              position="0.012 -0.017 0.015" >
+            </a-text>
+            
+            <a-text
+              value="Exit VR"
+              color="White"
+              scale="0.065 0.07 0.07"
+              position="0.056 -0.017 0.015"
+            ></a-text>
+            <a-gui-button
+              id="sizedown"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#eeeeee"
+              onclick="size(0.5)"
+            ></a-gui-button>
+            <a-gui-button
+              id="sizeup"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              font-color="black"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#eeeeee"
+              onclick="size(2)" 
+            ></a-gui-button>
+            <a-gui-button
+              id="brgb"
+              width="0.035"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#ffaaaa"
+              onclick="changeColoring('rgb')"
+            ></a-gui-button>
+            <a-gui-button
+              id="bclassification"
+              width="0.045"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              gui-interactable="clickAction:triggerdown; hoverAction:raycaster-intersected"
+              background-color="#aaaaff"
+              onclick="changeColoring('classification')"
+            ></a-gui-button>
+            <a-gui-button
+              id="exitvr"
+              width="0.06"
+              height="0.035"
+              base-depth="0.001"
+              depth="0.005"
+              gap="0.01"
+              hover-color="#ffff00"
+              on="click"
+              color="white"
+              onclick="AFRAME.scenes[0].exitVR()"
+            >
+            </a-gui-button>
+          </a-gui-flex-container>
+        </a-gui-flex-container>
+
+      
+ 
+
+        <a-entity
+          html="cursor:#cursor;html:#my-interface"
+          position="-1.042 -0.0166 -0.02928"
+          rotation="-80 90 0"
+          scale="0.5 0.5 0.5"
+        ></a-entity>
+      </a-entity>
+
+      <!-- markers to let us know the real location of the hands, you probably want to make them visible="false" or just make them empty <a-entities> -->
+      <!--       <a-entity
+        id="left-no-magnet"
+        data-left="grip"
+        data-no-magnet
+        radius="0.01"
+      >
+      </a-entity>
+      <a-entity
+        id="right-no-magnet"
+        data-right="grip"
+        data-no-magnet
+        radius="0.01"
+      ></a-entity> -->
+      <!-- 			</a-entity> -->
+    </a-entity>
+
+    <!-- tip spheres -->
+    <a-sphere
+      id="sphereR"
+      position="0 0 0"
+      material="color:red; opacity:0.5"
+      scale="2 2 2"
+    ></a-sphere>
+
+<!--     <a-sphere
+      id="sphereL"
+      position="0 0 0"
+      material="color:lightblue; opacity: 0.5"
+      scale="0.2 0.2 0.2"
+    ></a-sphere> -->
+
+    <a-entity
+      id="pointcloud"
+      position="0 0 -50"
+      rotation="270 0 0"
+      scale="1 1 1"
+      lasloader="
+    url: https://rawhitten.github.io/chunk.laz;
+    downid: #download-buttonid;
+    cameraEl: #camera;
+    lefthandEl: #lefthand;
+    righthandEl: #righthand;
+    pointcloudColoring: classification; 
+  "
+    >
+    </a-entity>
+  </a-scene>
+
+  <div id="dom-overlay">
+    <section id="my-interface">
+      <div id="grid">
+        <div id="classification-values">
+          <fieldset style="border: 0 none; border-top: 1px solid grey">
+            <legend><h2>Classification</h2></legend>
+            <button
+              id="c1"
+              class="outerclass"
+              style="background-color: #c8c8c8"
+            >
+              <p>1</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-unclassified"
+                class="classbtn"
+                name="pc_class"
+                value="0"
+                checked
+              /><label for="class-unclassified"> </label>
+            </button>
+            <button
+              id="c2"
+              class="outerclass"
+              style="background-color: #804e0a"
+            >
+              <p style="color: white">2</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-ground"
+                class="classbtn"
+                name="pc_class"
+                value="2"
+                checked
+              /><label for="class-ground"> </label>
+            </button>
+            <button
+              id="c3"
+              class="outerclass"
+              style="background-color: #167518"
+            >
+              <p style="color: white">3</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-lowvegetation"
+                class="classbtn"
+                name="pc_class"
+                value="3"
+                checked
+              /><label for="class-veg"> </label>
+            </button>
+            <button
+              id="c4"
+              class="outerclass"
+              style="background-color: #21a624"
+              hidden
+            >
+              <p>4</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-mediumvegetation"
+                class="classbtn"
+                name="pc_class"
+                value="4"
+                checked
+              /><label for="class-veg"> </label>
+            </button>
+            <button
+              id="c5"
+              class="outerclass"
+              style="background-color: #32ed36"
+              hidden
+            >
+              <p>5</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-unclasified"
+                class="classbtn"
+                name="pc_class"
+                value="5"
+                checked
+              /><label for="class-ground"> </label>
+            </button>
+            <button
+              id="c6"
+              class="outerclass"
+              style="background-color: #3a9ebd"
+            >
+              <p>6</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-building"
+                class="classbtn"
+                name="pc_class"
+                value="6"
+                checked
+              /><label for="class-veg"></label>
+            </button>
+            <button
+              id="c7"
+              class="outerclass"
+              style="background-color: #ff0000"
+            >
+              <p>7</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-lowpoint"
+                class="classbtn"
+                name="pc_class"
+                value="7"
+                checked
+              /><label for="class-lowpoint"></label>
+            </button>
+            <button
+              id="c8"
+              class="outerclass"
+              style="background-color: #ffff00"
+            >
+              <p>8</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-masspoint"
+                class="classbtn"
+                name="pc_class"
+                value="8"
+                checked
+              /><label for="class-masspoint"></label>
+            </button>
+            <button
+              id="c9"
+              class="outerclass"
+              style="background-color: #0000ff"
+            >
+              <p>9</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-water"
+                class="classbtn"
+                name="pc_class"
+                value="9"
+                checked
+              /><label for="class-water"></label>
+            </button>
+            <button
+              id="c10"
+              class="outerclass"
+              style="background-color: #ed8f02"
+            >
+              <p>10</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-reserved"
+                class="classbtn"
+                name="pc_class"
+                value="10"
+                checked
+              /><label for="class-res"></label>
+            </button>
+            <button
+              id="c11"
+              class="outerclass"
+              style="background-color: #ed8f02"
+            >
+              <p>11</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-reserved"
+                class="classbtn"
+                name="pc_class"
+                value="11"
+                checked
+              /><label for="class-res"></label>
+            </button>
+            <button
+              id="c12"
+              class="outerclass"
+              style="background-color: #ff00ff"
+            >
+              <p>12</p>
+              <input
+                onclick="handleRadio(this)"
+                type="radio"
+                id="class-overlap"
+                class="classbtn"
+                name="pc_class"
+                value="12"
+                checked
+              /><label for="class-overlap"></label>
+            </button>
+
+            <button id="plusbtn" class="outerclass" onclick="toggleAddClass()">
+              <h1>+</h1>
+            </button>
+          </fieldset>
+        </div>
+        <div id="point-size">
+          <h2>Point Size</h2>
+          <input
+            type="range"
+            min="1"
+            max="15"
+            value="1"
+            class="slider"
+            id="point"
+          />
+          <div id="pointsizevalue">1</div>
+        </div>
+        <div id="coloring">
+          <h2>Coloring</h2>
+
+          <button class="color">
+            <input
+              type="radio"
+              name="coloring"
+              class="radio"
+              value="classification"
+              onclick="changeColoring(this.value)"
+            />
+            <br />
+            Classification
+          </button>
+          <br />
+          <button class="color">
+            <input
+              type="radio"
+              name="coloring"
+              class="radio"
+              value="rgb"
+              onclick="changeColoring(this.value)"
+            />
+            <br />
+            RGB
+          </button>
+        </div>
+        <div id="exit-vr">
+          <h2>Settings</h2>
+          <button
+            onclick="AFRAME.scenes[0].exitVR()"
+            style="font-size: 20px; padding: 10px"
+          >
+            <p>Exit Immersive</p>
+          </button>
+        </div>
+
+        <div id="addcolor" hidden>
+          <h2>Add Classification</h2>
+          <button
+            id="a1"
+            class="addclass"
+            style="background-color: #c8c8c8"
+            value="1"
+            onclick="addcolor(this.value)"
+            hidden
+          >
+            <p>1</p>
+          </button>
+          <button
+            id="a2"
+            class="addclass"
+            style="background-color: #804e0a; color: white"
+            value="2"
+            onclick="addcolor(this.value)"
+            hidden
+          >
+            <p>2</p>
+          </button>
+          <button
+            id="a3"
+            class="addclass"
+            style="background-color: #167518; color: white"
+            value="3"
+            onclick="addcolor(this.value)"
+            hidden
+          >
+            <p>3</p>
+          </button>
+          <button
+            id="a4"
+            class="addclass"
+            style="background-color: #21a624; color: white"
+            value="4"
+            onclick="addcolor(this.value)"
+          >
+            <p>4</p>
+          </button>
+          <button
+            id="a5"
+            class="addclass"
+            style="background-color: #32ed36"
+            value="5"
+            onclick="addcolor(this.value)"
+          >
+            <p>5</p>
+          </button>
+          <button
+            id="a6"
+            class="addclass"
+            style="background-color: #3a9ebd"
+            value="6"
+            onclick="addcolor(this.value)"
+            hidden
+          >
+            <p>6</p>
+          </button>
+          <button
+            id="a7"
+            class="addclass"
+            style="background-color: #ff0000"
+            value="7"
+            onclick="addcolor(this.value)"
+          >
+            <p>7</p>
+          </button>
+          <button
+            id="a8"
+            class="addclass"
+            style="background-color: #ffff00"
+            value="8"
+            onclick="addcolor(this.value)"
+          >
+            <p>8</p>
+          </button>
+          <button
+            id="a9"
+            class="addclass"
+            style="background-color: #0000ff; color: white"
+            value="9"
+            onclick="addcolor(this.value)"
+          >
+            <p>9</p>
+          </button>
+          <button
+            id="a10"
+            class="addclass"
+            style="background-color: #ed8f02"
+            value="10"
+            onclick="addcolor(this.value)"
+          >
+            <p>10</p>
+          </button>
+          <button
+            id="a11"
+            class="addclass"
+            style="background-color: #ed8f02"
+            value="11"
+            onclick="addcolor(this.value)"
+          >
+            <p>11</p>
+          </button>
+          <button
+            id="a12"
+            class="addclass"
+            style="background-color: #ff00ff"
+            value="12"
+            onclick="addcolor(this.value)"
+          >
+            <p>12</p>
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // console.log("Hello")
+    const pointcloud = document.getElementById("pointcloud");
+    // console.log("pt -")
+    // console.log(pointcloud)
+    console.log(window.location.search);
+    var url = new URL(window.location.href);
+    var PTlink = url.searchParams.get("url");
+    console.log("Link for redirection:");
+    console.log(PTlink);
+    if (PTlink != null) {
+      pointcloud.setAttribute("lasloader", { url: PTlink });
+    }
+    function handleRadio(data) {
+      console.log(data);
+
+      //unselect current button
+      let curval =
+        document.getElementById("pointcloud").components.lasloader.data
+          .classificationValue;
+     // console.log(curval);
+      document
+        .querySelector("#b" + curval)
+        .setAttribute("border-color", "lightgray");
+      //document.querySelector("#b"+curval).setAttribute("toggle-state","false")
+
+      //console.log(data.attributes.value.value);
+      //console.log(document.getElementById("pointcloud").components.lasloader);
+      document
+        .getElementById("pointcloud")
+        .setAttribute("lasloader", "classificationValue", data);
+      //console.log(document.getElementById("b" + data));
+      //set border color of selected button to gray
+      document
+        .getElementById("b" + data)
+        .setAttribute("border-color", "yellow");
+      
+    }
+
+    function changeColoring(value) {
+     //unselect current button
+      let curval =
+        document.getElementById("pointcloud").components.lasloader.data
+          .pointcloudColoring;
+      curval = (curval).replace("'", "").replace("'", "")
+     
+      document
+        .querySelector("#b" + curval)
+        .setAttribute("border-color", "lightgray");
+      
+      // change value
+      document
+        .getElementById("pointcloud")
+        .setAttribute("lasloader", "pointcloudColoring", "'" + value + "'");
+      
+    
+      //set border color of selected button to gray
+      //console.log(value);
+      document
+        .querySelector("#b" + value)
+        .setAttribute("border-color", "yellow");
+    }
+
+    //console.log("left hand position: ");
+    //console.log(document.getElementById("lefthand").object3D.position);
+
+    // displays the value of the selected point size below the slider
+    let ptsize = document.getElementById("pointsizevalue");
+    // let slider = document.getElementById("point");
+    // ptsize.innerHTML = slider.value;
+
+    //point size slider
+    const maxsize = 10;
+    function slider() {
+      let value =
+        document.querySelector("#sizeslider").attributes[12].value * maxsize;
+      //console.log(document.querySelector("#sizeslider").attributes[12].value);
+      document
+        .getElementById("pointcloud")
+        .setAttribute("lasloader", "pointSize", value);
+    }
+    
+    /**
+    * Change point size
+    * x: factor to change size by
+    *   size up button calls size(2) which doubles point size
+    *   size down button calls size(0.5) which halves point size
+    */
+    function size(x) {
+      let value = document.getElementById("pointcloud").components.lasloader.data.pointSize;
+      // console.log(document.querySelector("#sizeslider").attributes[12].value);
+      document
+        .getElementById("pointcloud")
+        .setAttribute("lasloader", "pointSize", value*x);
+    }
+
+    // ray length slider
+    // let r = document.querySelector("#raylen");
+    // console.log(r);
+    // r.addEventListener(
+    //   "input",
+    //   function () {
+    //     raylenvalue.innerHTML = r.value;
+    //     console.log("ray len changed to " + r.value);
+    //     document
+    //       .getElementById("lefthand")
+    //       .setAttribute("raycaster", "far", r.value);
+    //     document
+    //       .getElementById("righthand")
+    //       .setAttribute("raycaster", "far", r.value);
+    //   },
+    //   false
+    // );
+
+    addcolor = function (value) {
+      console.log("adding color " + value);
+      document.getElementById("c" + value).hidden = false;
+      document.getElementById("a" + value).hidden = true;
+    };
+
+    //     url: https://rawhitten.github.io/chunk.laz;
+  </script>
+</html>
